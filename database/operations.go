@@ -2,6 +2,7 @@ package database
 
 import (
 	"fmt"
+	"rdbms/index"
 	"rdbms/schema"
 	"rdbms/storage"
 )

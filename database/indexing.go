@@ -1,6 +1,7 @@
 package database
 
 import (
+	"rdbms/index"
 	"rdbms/schema"
 )
 
