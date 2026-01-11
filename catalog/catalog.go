@@ -75,6 +75,16 @@ func (c *Catalog) CreateTable(tableName string, columns []schema.Column) error {
 		Columns: columns,
 	}
 
+	// Identify primary key
+	for _, col := range columns {
+		if col.PrimaryKey {
+			if table.PrimaryKey != "" {
+				return fmt.Errorf("multiple primary keys not allowed")
+			}
+			table.PrimaryKey = col.Name
+		}
+	}
+
 	c.schemas[tableName] = table
 	return c.save()
 }
@@ -92,4 +102,9 @@ func (c *Catalog) GetTable(tableName string) (*schema.Table, error) {
 func (c *Catalog) TableExists(tableName string) bool {
 	_, exists := c.schemas[tableName]
 	return exists
+}
+
+// GetAllTables returns all table schemas
+func (c *Catalog) GetAllTables() map[string]*schema.Table {
+	return c.schemas
 }

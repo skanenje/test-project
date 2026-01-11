@@ -11,12 +11,15 @@ const (
 
 // Column defines a table column
 type Column struct {
-	Name string     `json:"name"`
-	Type ColumnType `json:"type"`
+	Name       string     `json:"name"`
+	Type       ColumnType `json:"type"`
+	PrimaryKey bool       `json:"primary_key"`
+	Unique     bool       `json:"unique"`
 }
 
 // Table holds table metadata
 type Table struct {
-	Name    string   `json:"name"`
-	Columns []Column `json:"columns"`
+	Name       string   `json:"name"`
+	Columns    []Column `json:"columns"`
+	PrimaryKey string   `json:"primary_key"` // column name
 }

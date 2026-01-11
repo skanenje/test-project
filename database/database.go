@@ -3,6 +3,7 @@ package database
 import (
 	"fmt"
 	"rdbms/catalog"
+	"rdbms/index"
 	"rdbms/parser"
 	"rdbms/schema"
 	"rdbms/storage"
@@ -12,6 +13,7 @@ import (
 type Database struct {
 	storage *storage.Engine
 	catalog *catalog.Catalog
+	indexes map[string]map[string]*index.Index // table -> column -> index
 }
 
 // New creates a new database instance
@@ -26,15 +28,74 @@ func New(dataDir string) (*Database, error) {
 		return nil, err
 	}
 
-	return &Database{
+	db := &Database{
 		storage: storageEngine,
 		catalog: cat,
-	}, nil
+		indexes: make(map[string]map[string]*index.Index),
+	}
+
+	// Rebuild indexes for existing tables
+	if err := db.rebuildAllIndexes(); err != nil {
+		return nil, err
+	}
+
+	return db, nil
+}
+
+// rebuildAllIndexes rebuilds indexes for all tables
+func (db *Database) rebuildAllIndexes() error {
+	tables := db.catalog.GetAllTables()
+	for tableName, table := range tables {
+		if err := db.rebuildIndexes(tableName, table); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// rebuildIndexes rebuilds indexes for a specific table
+func (db *Database) rebuildIndexes(tableName string, table *schema.Table) error {
+	db.indexes[tableName] = make(map[string]*index.Index)
+
+	// Create index structures for PK and unique columns
+	for _, col := range table.Columns {
+		if col.PrimaryKey || col.Unique {
+			db.indexes[tableName][col.Name] = index.New(col.Name)
+		}
+	}
+
+	// Populate indexes from existing data
+	rows, err := db.storage.ScanAll(tableName)
+	if err != nil {
+		return err
+	}
+
+	for _, r := range rows {
+		for colName, idx := range db.indexes[tableName] {
+			if val, exists := r.Row[colName]; exists {
+				idx.Add(val, r.ID)
+			}
+		}
+	}
+
+	return nil
 }
 
 // CreateTable creates a new table
 func (db *Database) CreateTable(tableName string, columns []schema.Column) error {
-	return db.catalog.CreateTable(tableName, columns)
+	if err := db.catalog.CreateTable(tableName, columns); err != nil {
+		return err
+	}
+
+	// Create indexes for PK and unique columns
+	db.indexes[tableName] = make(map[string]*index.Index)
+	for _, col := range columns {
+		if col.PrimaryKey || col.Unique {
+			db.indexes[tableName][col.Name] = index.New(col.Name)
+		}
+	}
+
+	return nil
 }
 
 // GetTable retrieves a table schema
@@ -54,7 +115,42 @@ func (db *Database) Insert(tableName string, row storage.Row) (int64, error) {
 		return 0, err
 	}
 
-	return db.storage.InsertRow(tableName, row)
+	// Check primary key uniqueness
+	if table.PrimaryKey != "" {
+		if idx, exists := db.indexes[tableName][table.PrimaryKey]; exists {
+			pkValue := row[table.PrimaryKey]
+			if idx.Exists(pkValue) {
+				return 0, fmt.Errorf("primary key violation: duplicate value '%v'", pkValue)
+			}
+		}
+	}
+
+	// Check unique constraints
+	for _, col := range table.Columns {
+		if col.Unique && !col.PrimaryKey {
+			if idx, exists := db.indexes[tableName][col.Name]; exists {
+				value := row[col.Name]
+				if idx.Exists(value) {
+					return 0, fmt.Errorf("unique constraint violation on column '%s'", col.Name)
+				}
+			}
+		}
+	}
+
+	// Insert row
+	rowID, err := db.storage.InsertRow(tableName, row)
+	if err != nil {
+		return 0, err
+	}
+
+	// Update indexes
+	for colName, idx := range db.indexes[tableName] {
+		if val, exists := row[colName]; exists {
+			idx.Add(val, rowID)
+		}
+	}
+
+	return rowID, nil
 }
 
 // validateRow validates a row against schema
@@ -91,29 +187,61 @@ func (db *Database) validateRow(table *schema.Table, row storage.Row) error {
 	return nil
 }
 
-// Select selects rows from a table with optional WHERE clause
+// Select selects rows from a table with optional WHERE clause (uses index if available)
 func (db *Database) Select(tableName string, where *parser.WhereClause) ([]storage.Row, error) {
 	if !db.catalog.TableExists(tableName) {
 		return nil, fmt.Errorf("table '%s' does not exist", tableName)
 	}
 
-	rowsWithID, err := db.storage.ScanAll(tableName)
-	if err != nil {
-		return nil, err
+	var rowsWithID []storage.RowWithID
+
+	// Try to use index for WHERE clause
+	if where != nil {
+		if idx, hasIndex := db.indexes[tableName][where.Column]; hasIndex {
+			// Index hit! Fetch only matching rows
+			if rowIDs, found := idx.Lookup(where.Value); found {
+				allRows, err := db.storage.ScanAll(tableName)
+				if err != nil {
+					return nil, err
+				}
+
+				rowIDMap := make(map[int64]bool)
+				for _, id := range rowIDs {
+					rowIDMap[id] = true
+				}
+
+				for _, r := range allRows {
+					if rowIDMap[r.ID] {
+						rowsWithID = append(rowsWithID, r)
+					}
+				}
+			}
+		} else {
+			// No index, fall back to full scan
+			allRows, err := db.storage.ScanAll(tableName)
+			if err != nil {
+				return nil, err
+			}
+
+			for _, r := range allRows {
+				if val, exists := r.Row[where.Column]; exists {
+					if valuesEqual(val, where.Value) {
+						rowsWithID = append(rowsWithID, r)
+					}
+				}
+			}
+		}
+	} else {
+		// No WHERE clause, full scan
+		var err error
+		rowsWithID, err = db.storage.ScanAll(tableName)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	var rows []storage.Row
 	for _, r := range rowsWithID {
-		// Apply WHERE filter if present
-		if where != nil {
-			if val, exists := r.Row[where.Column]; exists {
-				if !valuesEqual(val, where.Value) {
-					continue
-				}
-			} else {
-				continue
-			}
-		}
 		rows = append(rows, r.Row)
 	}
 
@@ -138,6 +266,13 @@ func (db *Database) Delete(tableName string, where *parser.WhereClause) (int, er
 	count := 0
 	for _, r := range rows {
 		if val, exists := r.Row[where.Column]; exists && valuesEqual(val, where.Value) {
+			// Remove from indexes
+			for colName, idx := range db.indexes[tableName] {
+				if colVal, exists := r.Row[colName]; exists {
+					idx.Remove(colVal, r.ID)
+				}
+			}
+
 			db.storage.DeleteRow(tableName, r.ID)
 			count++
 		}
@@ -165,6 +300,13 @@ func (db *Database) Update(tableName string, setColumn string, setValue interfac
 	count := 0
 	for _, r := range rows {
 		if val, exists := r.Row[where.Column]; exists && valuesEqual(val, where.Value) {
+			// Remove old from indexes
+			for colName, idx := range db.indexes[tableName] {
+				if colVal, exists := r.Row[colName]; exists {
+					idx.Remove(colVal, r.ID)
+				}
+			}
+
 			newRow := make(storage.Row)
 			for k, v := range r.Row {
 				newRow[k] = v
@@ -175,7 +317,15 @@ func (db *Database) Update(tableName string, setColumn string, setValue interfac
 				return count, err
 			}
 
-			db.storage.UpdateRow(tableName, r.ID, newRow)
+			newRowID, _ := db.storage.UpdateRow(tableName, r.ID, newRow)
+
+			// Add new to indexes
+			for colName, idx := range db.indexes[tableName] {
+				if colVal, exists := newRow[colName]; exists {
+					idx.Add(colVal, newRowID)
+				}
+			}
+
 			count++
 		}
 	}
