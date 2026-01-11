@@ -32,6 +32,8 @@ func (e *Executor) Execute(stmt *parser.ParsedStatement) (string, error) {
 		return e.executeDelete(stmt)
 	case "UPDATE":
 		return e.executeUpdate(stmt)
+	case "JOIN":
+		return e.executeJoin(stmt)
 	default:
 		return "", fmt.Errorf("unknown statement type: %s", stmt.Type)
 	}
@@ -107,4 +109,12 @@ func formatRows(rows []storage.Row) string {
 		result.WriteString(fmt.Sprintf("%v\n", row))
 	}
 	return strings.TrimSpace(result.String())
+}
+
+func (e *Executor) executeJoin(stmt *parser.ParsedStatement) (string, error) {
+	rows, err := e.db.Join(stmt.TableName, stmt.JoinTable, stmt.JoinCondition, stmt.Where)
+	if err != nil {
+		return "", err
+	}
+	return formatRows(rows), nil
 }

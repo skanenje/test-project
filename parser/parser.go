@@ -17,13 +17,23 @@ type WhereClause struct {
 
 // ParsedStatement represents a parsed SQL statement
 type ParsedStatement struct {
-	Type       string // CREATE_TABLE, INSERT, SELECT, UPDATE, DELETE
-	TableName  string
-	Columns    []schema.Column
-	Values     map[string]interface{}
-	Where      *WhereClause
-	SetColumn  string
-	SetValue   interface{}
+	Type          string // CREATE_TABLE, INSERT, SELECT, UPDATE, DELETE, JOIN
+	TableName     string
+	Columns       []schema.Column
+	Values        map[string]interface{}
+	Where         *WhereClause
+	SetColumn     string
+	SetValue      interface{}
+	JoinTable     string
+	JoinCondition *JoinCondition
+}
+
+// JoinCondition represents ON clause
+type JoinCondition struct {
+	LeftTable   string
+	LeftColumn  string
+	RightTable  string
+	RightColumn string
 }
 
 // Parser handles SQL parsing
@@ -44,6 +54,10 @@ func (p *Parser) Parse(sql string) (*ParsedStatement, error) {
 	} else if strings.HasPrefix(sqlUpper, "INSERT INTO") {
 		return p.parseInsert(sql)
 	} else if strings.HasPrefix(sqlUpper, "SELECT") {
+		// Check for JOIN
+		if strings.Contains(sqlUpper, " JOIN ") {
+			return p.parseJoin(sql)
+		}
 		return p.parseSelect(sql)
 	} else if strings.HasPrefix(sqlUpper, "DELETE FROM") {
 		return p.parseDelete(sql)
@@ -226,4 +240,52 @@ func parseValue(str string) interface{} {
 
 	// Default: string
 	return str
+}
+
+func (p *Parser) parseJoin(sql string) (*ParsedStatement, error) {
+	// SELECT * FROM users JOIN posts ON users.id = posts.user_id
+	// SELECT * FROM users JOIN posts ON users.id = posts.user_id WHERE posts.published = true
+	re := regexp.MustCompile(`(?i)SELECT\s+\*\s+FROM\s+(\w+)\s+JOIN\s+(\w+)\s+ON\s+(\w+)\.(\w+)\s*=\s*(\w+)\.(\w+)(?:\s+WHERE\s+([\w.]+)\s*=\s*(.+))?`)
+	matches := re.FindStringSubmatch(sql)
+	if len(matches) < 7 {
+		return nil, fmt.Errorf("invalid JOIN syntax")
+	}
+
+	leftTable := matches[1]
+	rightTable := matches[2]
+	leftJoinTable := matches[3]
+	leftJoinCol := matches[4]
+	rightJoinTable := matches[5]
+	rightJoinCol := matches[6]
+
+	// Validate join condition references correct tables
+	if leftJoinTable != leftTable {
+		return nil, fmt.Errorf("join condition references unknown table '%s'", leftJoinTable)
+	}
+	if rightJoinTable != rightTable {
+		return nil, fmt.Errorf("join condition references unknown table '%s'", rightJoinTable)
+	}
+
+	condition := &JoinCondition{
+		LeftTable:   leftTable,
+		LeftColumn:  leftJoinCol,
+		RightTable:  rightTable,
+		RightColumn: rightJoinCol,
+	}
+
+	var where *WhereClause
+	if len(matches) == 9 && matches[7] != "" {
+		whereColumn := matches[7]
+		whereValueStr := strings.TrimSpace(matches[8])
+		whereValue := parseValue(whereValueStr)
+		where = &WhereClause{Column: whereColumn, Value: whereValue}
+	}
+
+	return &ParsedStatement{
+		Type:          "JOIN",
+		TableName:     leftTable,
+		JoinTable:     rightTable,
+		JoinCondition: condition,
+		Where:         where,
+	}, nil
 }

@@ -4,16 +4,23 @@
     "columns": [
       {
         "name": "id",
-        "type": "INT"
+        "type": "INT",
+        "primary_key": true,
+        "unique": false
+      },
+      {
+        "name": "email",
+        "type": "TEXT",
+        "primary_key": false,
+        "unique": true
       },
       {
         "name": "name",
-        "type": "TEXT"
-      },
-      {
-        "name": "active",
-        "type": "BOOL"
+        "type": "TEXT",
+        "primary_key": false,
+        "unique": false
       }
-    ]
+    ],
+    "primary_key": "id"
   }
 }
