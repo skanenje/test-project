@@ -3,6 +3,7 @@ package database
 import (
 	"fmt"
 	"rdbms/catalog"
+	"rdbms/parser"
 	"rdbms/schema"
 	"rdbms/storage"
 )
@@ -34,6 +35,11 @@ func New(dataDir string) (*Database, error) {
 // CreateTable creates a new table
 func (db *Database) CreateTable(tableName string, columns []schema.Column) error {
 	return db.catalog.CreateTable(tableName, columns)
+}
+
+// GetTable retrieves a table schema
+func (db *Database) GetTable(tableName string) (*schema.Table, error) {
+	return db.catalog.GetTable(tableName)
 }
 
 // Insert inserts a row into a table
@@ -85,8 +91,8 @@ func (db *Database) validateRow(table *schema.Table, row storage.Row) error {
 	return nil
 }
 
-// SelectAll selects all rows from a table
-func (db *Database) SelectAll(tableName string) ([]storage.Row, error) {
+// Select selects rows from a table with optional WHERE clause
+func (db *Database) Select(tableName string, where *parser.WhereClause) ([]storage.Row, error) {
 	if !db.catalog.TableExists(tableName) {
 		return nil, fmt.Errorf("table '%s' does not exist", tableName)
 	}
@@ -96,32 +102,88 @@ func (db *Database) SelectAll(tableName string) ([]storage.Row, error) {
 		return nil, err
 	}
 
-	rows := make([]storage.Row, len(rowsWithID))
-	for i, r := range rowsWithID {
-		rows[i] = r.Row
+	var rows []storage.Row
+	for _, r := range rowsWithID {
+		// Apply WHERE filter if present
+		if where != nil {
+			if val, exists := r.Row[where.Column]; exists {
+				if !valuesEqual(val, where.Value) {
+					continue
+				}
+			} else {
+				continue
+			}
+		}
+		rows = append(rows, r.Row)
 	}
 
 	return rows, nil
 }
 
-// Delete deletes a row by ID
-func (db *Database) Delete(tableName string, rowID int64) error {
+// Delete deletes rows matching WHERE clause
+func (db *Database) Delete(tableName string, where *parser.WhereClause) (int, error) {
 	if !db.catalog.TableExists(tableName) {
-		return fmt.Errorf("table '%s' does not exist", tableName)
+		return 0, fmt.Errorf("table '%s' does not exist", tableName)
 	}
-	return db.storage.DeleteRow(tableName, rowID)
+
+	if where == nil {
+		return 0, fmt.Errorf("DELETE requires WHERE clause")
+	}
+
+	rows, err := db.storage.ScanAll(tableName)
+	if err != nil {
+		return 0, err
+	}
+
+	count := 0
+	for _, r := range rows {
+		if val, exists := r.Row[where.Column]; exists && valuesEqual(val, where.Value) {
+			db.storage.DeleteRow(tableName, r.ID)
+			count++
+		}
+	}
+
+	return count, nil
 }
 
-// Update updates a row
-func (db *Database) Update(tableName string, rowID int64, newData storage.Row) (int64, error) {
+// Update updates rows matching WHERE clause
+func (db *Database) Update(tableName string, setColumn string, setValue interface{}, where *parser.WhereClause) (int, error) {
 	table, err := db.catalog.GetTable(tableName)
 	if err != nil {
 		return 0, err
 	}
 
-	if err := db.validateRow(table, newData); err != nil {
+	if where == nil {
+		return 0, fmt.Errorf("UPDATE requires WHERE clause")
+	}
+
+	rows, err := db.storage.ScanAll(tableName)
+	if err != nil {
 		return 0, err
 	}
 
-	return db.storage.UpdateRow(tableName, rowID, newData)
+	count := 0
+	for _, r := range rows {
+		if val, exists := r.Row[where.Column]; exists && valuesEqual(val, where.Value) {
+			newRow := make(storage.Row)
+			for k, v := range r.Row {
+				newRow[k] = v
+			}
+			newRow[setColumn] = setValue
+
+			if err := db.validateRow(table, newRow); err != nil {
+				return count, err
+			}
+
+			db.storage.UpdateRow(tableName, r.ID, newRow)
+			count++
+		}
+	}
+
+	return count, nil
+}
+
+// Helper to compare values
+func valuesEqual(a, b interface{}) bool {
+	return fmt.Sprintf("%v", a) == fmt.Sprintf("%v", b)
 }

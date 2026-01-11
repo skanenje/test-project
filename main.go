@@ -1,66 +1,71 @@
-// Simple RDBMS - Phase 1: Storage Layer + Schema + Basic CRUD
+// Simple RDBMS - Phase 2: SQL Parser + WHERE + REPL
 //
-// Demo application showing basic database operations
+// Added in Phase 2:
+// - SQL parser (CREATE TABLE, INSERT, SELECT, UPDATE, DELETE)
+// - WHERE clause support (column = value)
+// - Interactive REPL
 
 package main
 
 import (
+	"bufio"
 	"fmt"
+	"os"
+	"strings"
+
 	"rdbms/database"
-	"rdbms/schema"
-	"rdbms/storage"
+	"rdbms/executor"
+	"rdbms/parser"
 )
 
+func runREPL(db *database.Database) {
+	p := parser.New()
+	exec := executor.New(db)
+	scanner := bufio.NewScanner(os.Stdin)
+
+	fmt.Println("=== Simple RDBMS REPL ===")
+	fmt.Println("Type SQL commands or 'exit' to quit")
+	fmt.Println()
+
+	for {
+		fmt.Print("sql> ")
+		if !scanner.Scan() {
+			break
+		}
+
+		input := strings.TrimSpace(scanner.Text())
+		if input == "" {
+			continue
+		}
+
+		if strings.ToLower(input) == "exit" || strings.ToLower(input) == "quit" {
+			fmt.Println("Goodbye!")
+			break
+		}
+
+		stmt, err := p.Parse(input)
+		if err != nil {
+			fmt.Printf("Parse error: %v\n", err)
+			fmt.Println()
+			continue
+		}
+
+		result, err := exec.Execute(stmt)
+		if err != nil {
+			fmt.Printf("Error: %v\n", err)
+		} else {
+			fmt.Println(result)
+		}
+		fmt.Println()
+	}
+}
+
 func main() {
-	// Initialize database
 	db, err := database.New("./demo_data")
 	if err != nil {
 		panic(err)
 	}
 
-	// Create a users table
-	err = db.CreateTable("users", []schema.Column{
-		{Name: "id", Type: schema.TypeInt},
-		{Name: "name", Type: schema.TypeText},
-		{Name: "active", Type: schema.TypeBool},
-	})
-	if err != nil {
-		panic(err)
-	}
-	fmt.Println("✓ Created table 'users'")
-
-	// Insert rows
-	rowID1, _ := db.Insert("users", storage.Row{"id": 1.0, "name": "Alice", "active": true})
-	rowID2, _ := db.Insert("users", storage.Row{"id": 2.0, "name": "Bob", "active": false})
-	rowID3, _ := db.Insert("users", storage.Row{"id": 3.0, "name": "Charlie", "active": true})
-	fmt.Printf("✓ Inserted 3 rows (row_ids: %d, %d, %d)\n", rowID1, rowID2, rowID3)
-
-	// Select all
-	fmt.Println("\n📊 SELECT * FROM users:")
-	rows, _ := db.SelectAll("users")
-	for _, row := range rows {
-		fmt.Printf("  %v\n", row)
-	}
-
-	// Delete Bob
-	db.Delete("users", rowID2)
-	fmt.Printf("\n✓ Deleted row %d (Bob)\n", rowID2)
-
-	// Select again
-	fmt.Println("\n📊 SELECT * FROM users (after delete):")
-	rows, _ = db.SelectAll("users")
-	for _, row := range rows {
-		fmt.Printf("  %v\n", row)
-	}
-
-	// Update Alice
-	newRowID, _ := db.Update("users", rowID1, storage.Row{"id": 1.0, "name": "Alice Smith", "active": true})
-	fmt.Printf("\n✓ Updated Alice (new row_id: %d)\n", newRowID)
-
-	// Final select
-	fmt.Println("\n📊 SELECT * FROM users (after update):")
-	rows, _ = db.SelectAll("users")
-	for _, row := range rows {
-		fmt.Printf("  %v\n", row)
-	}
+	// Run REPL
+	runREPL(db)
 }
