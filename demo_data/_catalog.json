@@ -1,0 +1,19 @@
+{
+  "users": {
+    "name": "users",
+    "columns": [
+      {
+        "name": "id",
+        "type": "INT"
+      },
+      {
+        "name": "name",
+        "type": "TEXT"
+      },
+      {
+        "name": "active",
+        "type": "BOOL"
+      }
+    ]
+  }
+}
