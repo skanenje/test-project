@@ -7,7 +7,11 @@ import (
 )
 
 // Join performs INNER JOIN using nested-loop algorithm
+// Now uses state derived from event log
 func (db *Database) Join(leftTable, rightTable string, condition *parser.JoinCondition, where *parser.WhereClause) ([]storage.Row, error) {
+	db.mu.RLock()
+	defer db.mu.RUnlock()
+
 	if !db.catalog.TableExists(leftTable) {
 		return nil, fmt.Errorf("table '%s' does not exist", leftTable)
 	}
@@ -15,15 +19,14 @@ func (db *Database) Join(leftTable, rightTable string, condition *parser.JoinCon
 		return nil, fmt.Errorf("table '%s' does not exist", rightTable)
 	}
 
-	leftRows, err := db.storage.ScanAll(leftTable)
+	// Get current state from query engine
+	state, err := db.queryEngine.GetCurrentState()
 	if err != nil {
 		return nil, err
 	}
 
-	rightRows, err := db.storage.ScanAll(rightTable)
-	if err != nil {
-		return nil, err
-	}
+	leftRows := state.GetTableRows(leftTable)
+	rightRows := state.GetTableRows(rightTable)
 
 	var result []storage.Row
 

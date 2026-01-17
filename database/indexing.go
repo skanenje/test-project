@@ -5,7 +5,7 @@ import (
 	"rdbms/schema"
 )
 
-// rebuildAllIndexes rebuilds indexes for all tables
+// rebuildAllIndexes rebuilds indexes for all tables from current state
 func (db *Database) rebuildAllIndexes() error {
 	tables := db.catalog.GetAllTables()
 	for tableName, table := range tables {
@@ -16,9 +16,10 @@ func (db *Database) rebuildAllIndexes() error {
 	return nil
 }
 
-// rebuildIndexes rebuilds indexes for a specific table
+// rebuildIndexes rebuilds indexes for a specific table from event-derived state
 func (db *Database) rebuildIndexes(tableName string, table *schema.Table) error {
 	db.indexes[tableName] = make(map[string]*index.Index)
+	db.nextRowID[tableName] = 0
 
 	// Create index structures for PK and unique columns
 	for _, col := range table.Columns {
@@ -27,13 +28,20 @@ func (db *Database) rebuildIndexes(tableName string, table *schema.Table) error 
 		}
 	}
 
-	// Populate indexes from existing data
-	rows, err := db.storage.ScanAll(tableName)
+	// Populate indexes from current derived state
+	state, err := db.queryEngine.GetCurrentState()
 	if err != nil {
 		return err
 	}
 
+	rows := state.GetTableRows(tableName)
 	for _, r := range rows {
+		// Track next row ID
+		if r.ID >= db.nextRowID[tableName] {
+			db.nextRowID[tableName] = r.ID + 1
+		}
+
+		// Add to indexes
 		for colName, idx := range db.indexes[tableName] {
 			if val, exists := r.Row[colName]; exists {
 				idx.Add(val, r.ID)

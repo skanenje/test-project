@@ -6,7 +6,11 @@ import (
 )
 
 // Insert inserts a row into a table
+// Now emits a ROW_INSERTED event instead of directly mutating storage
 func (db *Database) Insert(tableName string, row storage.Row) (int64, error) {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+
 	table, err := db.catalog.GetTable(tableName)
 	if err != nil {
 		return 0, err
@@ -14,6 +18,12 @@ func (db *Database) Insert(tableName string, row storage.Row) (int64, error) {
 
 	// Validate columns
 	if err := db.validateRow(table, row); err != nil {
+		return 0, err
+	}
+
+	// Get current state to check constraints
+	state, err := db.queryEngine.GetCurrentState()
+	if err != nil {
 		return 0, err
 	}
 
@@ -39,8 +49,13 @@ func (db *Database) Insert(tableName string, row storage.Row) (int64, error) {
 		}
 	}
 
-	// Insert row
-	rowID, err := db.storage.InsertRow(tableName, row)
+	// Generate row ID
+	rowID := db.nextRowID[tableName]
+	db.nextRowID[tableName]++
+
+	// Record the insertion event
+	txID := fmt.Sprintf("tx_%d", db.eventStore.GetLastEventID())
+	_, err = db.eventStore.RecordRowInserted(tableName, rowID, row, txID)
 	if err != nil {
 		return 0, err
 	}
@@ -49,6 +64,16 @@ func (db *Database) Insert(tableName string, row storage.Row) (int64, error) {
 	for colName, idx := range db.indexes[tableName] {
 		if val, exists := row[colName]; exists {
 			idx.Add(val, rowID)
+		}
+	}
+
+	// Invalidate query cache
+	db.queryEngine.InvalidateCache()
+
+	// Check if we should create a snapshot
+	if db.eventStore.GetLastEventID()%uint64(db.snapshotInterval) == 0 {
+		if state != nil {
+			db.snapshotManager.CreateSnapshot(state, db.eventStore.GetLastEventID())
 		}
 	}
 

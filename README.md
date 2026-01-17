@@ -1,28 +1,32 @@
 # Simple RDBMS
 
-A lightweight relational database management system (RDBMS) written in Go, featuring an interactive SQL REPL with support for basic SQL operations.
+A lightweight relational database management system (RDBMS) written in Go, featuring an event-sourced architecture, schema evolution, and a simple web interface.
 
-## Features
+## Key Features
 
-- **SQL Support**: CREATE TABLE, INSERT, SELECT, UPDATE, DELETE
-- **WHERE Clause**: Filter data with column-value conditions
-- **Interactive REPL**: Command-line interface for executing SQL queries
-- **Type Safety**: Schema management with column type definitions
-- **In-Memory Storage**: Fast data storage and retrieval
-- **Query Parsing**: Full SQL statement parser
+- **Event-Sourced Architecture:** All database changes are stored as events in an append-only log, providing a complete audit trail.
+- **Schema Evolution:** Supports creating tables and evolving schemas over time using migrations.
+- **CRUD Operations:** Supports `INSERT`, `SELECT`, `UPDATE`, and `DELETE` operations.
+- **Indexing:** Supports creating indexes on columns for faster lookups.
+- **Joins:** Supports `INNER JOIN` operations.
+- **Snapshots:** Can create snapshots of the database state to speed up query performance.
+- **Web Interface:** A simple web interface to interact with the database.
 
 ## Project Structure
 
 ```
 ├── catalog/          # Database catalog management
-├── database/         # Core database engine
+├── cmd/web/          # Web server code
+├── database/         # Core database engine (CRUD, joins, indexing)
+├── demo_data/        # Example data files
+├── eventlog/         # Event log management
 ├── executor/         # SQL statement execution
 ├── index/            # Indexing support
 ├── parser/           # SQL parser
-├── schema/           # Schema definitions
-├── storage/          # Data storage engine
-├── demo_data/        # Example data files
-├── main.go           # Entry point and REPL
+├── rdbms/            # Main application entry point
+├── schema/           # Schema definitions and evolution
+├── storage/          # Physical storage (event store, snapshots, query engine)
+├── main.go           # Entry point
 └── go.mod            # Module definition
 ```
 
@@ -40,44 +44,49 @@ cd test-project
 go mod download
 ```
 
-### Running the REPL
+### Running the Web Server
 
 ```bash
-go run main.go
+go run main.go web 8080
 ```
 
-You'll see the REPL prompt:
-```
-=== Simple RDBMS REPL ===
-Type SQL commands or 'exit' to quit
+The web server will be available at `http://localhost:8080`.
 
-sql>
+### Running Tests
+
+```bash
+go test ./...
 ```
 
-### Example Usage
+## Example Usage
+
+The web interface provides a simple way to interact with the database. You can execute SQL queries and view the results in your browser.
+
+1.  Start the web server as described above.
+2.  Open your browser and navigate to `http://localhost:8080`.
+3.  Use the form to execute SQL queries.
+
+**Example Queries:**
 
 ```sql
 -- Create a table
-sql> CREATE TABLE users (id INT, name VARCHAR(100), age INT)
+CREATE TABLE users (id INT, name VARCHAR(100), age INT)
 
 -- Insert data
-sql> INSERT INTO users VALUES (1, 'Alice', 30)
-sql> INSERT INTO users VALUES (2, 'Bob', 25)
+INSERT INTO users VALUES (1, 'Alice', 30)
+INSERT INTO users VALUES (2, 'Bob', 25)
 
 -- Select all records
-sql> SELECT * FROM users
+SELECT * FROM users
 
 -- Select with WHERE clause
-sql> SELECT * FROM users WHERE age > 25
+SELECT * FROM users WHERE age > 25
 
 -- Update records
-sql> UPDATE users SET age = 31 WHERE name = 'Alice'
+UPDATE users SET age = 31 WHERE name = 'Alice'
 
 -- Delete records
-sql> DELETE FROM users WHERE id = 2
-
--- Exit REPL
-sql> exit
+DELETE FROM users WHERE id = 2
 ```
 
 ## Core Components
@@ -92,10 +101,10 @@ Manages database initialization, table creation, and transaction handling.
 Executes parsed SQL statements against the database. Handles INSERT, SELECT, UPDATE, DELETE operations.
 
 ### Schema (`schema/`)
-Defines table structures, column types, and metadata.
+Defines table structures, column types, and metadata. Manages schema evolution and migrations.
 
 ### Storage (`storage/`)
-Low-level data storage and retrieval engine.
+Low-level data storage and retrieval engine. Includes the event store, snapshot manager, and query engine.
 
 ### Catalog (`catalog/`)
 Maintains metadata about all tables and their schemas.
@@ -103,14 +112,17 @@ Maintains metadata about all tables and their schemas.
 ### Index (`index/`)
 Provides indexing capabilities for faster data lookup.
 
+### Event Log (`eventlog/`)
+Manages the append-only log of database events.
+
 ## Development
 
 To extend this RDBMS:
 
-1. **Add SQL Keywords**: Modify `parser/parser.go`
-2. **Implement New Operations**: Add executors in `executor/executor.go`
-3. **Optimize Storage**: Enhance `storage/engine.go`
-4. **Improve Indexing**: Update `index/index.go`
+1.  **Add SQL Keywords**: Modify `parser/parser.go`
+2.  **Implement New Operations**: Add executors in `executor/executor.go`
+3.  **Optimize Storage**: Enhance `storage/engine.go`
+4.  **Improve Indexing**: Update `index/index.go`
 
 ## License
 
@@ -118,4 +130,4 @@ MIT
 
 ## Notes
 
-This is a simplified RDBMS implementation designed for educational purposes. It demonstrates core database concepts including parsing, schema management, and query execution.
+This is a simplified RDBMS implementation designed for educational purposes. It demonstrates core database concepts including parsing, schema management, query execution, and event sourcing.
