@@ -1,8 +1,6 @@
 package storage
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -10,23 +8,6 @@ import (
 	"sync"
 	"time"
 )
-
-// SnapshotMeta contains metadata about a snapshot
-type SnapshotMeta struct {
-	SnapshotID     string    `json:"snapshot_id"`
-	BaseEventID    uint64    `json:"base_event_id"`
-	CreatedAt      time.Time `json:"created_at"`
-	SnapshotPath   string    `json:"snapshot_path"`
-	DataHash       string    `json:"data_hash"`
-	EventsIncluded int64     `json:"events_included"`
-}
-
-// SnapshotData holds the actual state data
-type SnapshotData struct {
-	Meta        SnapshotMeta              `json:"meta"`
-	Tables      map[string]map[int64]Row  `json:"tables"`
-	DeletedRows map[string]map[int64]bool `json:"deleted_rows"`
-}
 
 // SnapshotManager handles snapshot creation, storage, and restoration
 type SnapshotManager struct {
@@ -111,7 +92,7 @@ func (sm *SnapshotManager) CreateSnapshot(state *DerivedState, baseEventID uint6
 		CreatedAt:      time.Now().UTC(),
 		SnapshotPath:   filepath.Join(sm.snapshotDir, snapshotID+".json"),
 		DataHash:       dataHash,
-		EventsIncluded: sm.countEvents(state),
+		EventsIncluded: countEvents(state),
 	}
 
 	// Create snapshot data
@@ -245,28 +226,4 @@ func (sm *SnapshotManager) PruneOldSnapshots(keepCount int) error {
 
 	// Persist index
 	return sm.saveSnapshotIndex()
-}
-
-// computeSnapshotHash computes SHA256 hash of snapshot data
-func computeSnapshotHash(state *DerivedState) (string, error) {
-	// Marshal state to deterministic JSON for hashing
-	data, err := json.Marshal(state)
-	if err != nil {
-		return "", err
-	}
-
-	hash := sha256.Sum256(data)
-	return hex.EncodeToString(hash[:]), nil
-}
-
-// countEvents counts total number of events represented in the state
-func (sm *SnapshotManager) countEvents(state *DerivedState) int64 {
-	count := int64(0)
-	for _, tableRows := range state.Tables {
-		count += int64(len(tableRows))
-	}
-	for _, deletedSet := range state.DeletedRows {
-		count += int64(len(deletedSet))
-	}
-	return count
 }
