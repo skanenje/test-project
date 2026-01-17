@@ -266,6 +266,18 @@ func (es *EventStore) GetRowVersion(tableName string, rowID int64) (uint64, erro
 	return 0, fmt.Errorf("row %d not found in table %s", rowID, tableName)
 }
 
+// ReadAllEvents returns all events from the event log
+func (es *EventStore) ReadAllEvents() ([]*eventlog.Event, error) {
+	es.mu.RLock()
+	defer es.mu.RUnlock()
+
+	events, errs := es.log.Read()
+	if len(errs) > 0 {
+		return events, fmt.Errorf("encountered %d errors reading events: %v", len(errs), errs[0].Error)
+	}
+	return events, nil
+}
+
 // Close closes the event store
 func (es *EventStore) Close() error {
 	es.mu.Lock()

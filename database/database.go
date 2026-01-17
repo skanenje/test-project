@@ -61,6 +61,11 @@ func New(dataDir string) (*Database, error) {
 	return db, nil
 }
 
+// GetEventStore returns the underlying event store
+func (db *Database) GetEventStore() *storage.EventStore {
+	return db.eventStore
+}
+
 // Close closes the database
 func (db *Database) Close() error {
 	return db.eventStore.Close()

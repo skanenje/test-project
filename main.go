@@ -1,7 +1,3 @@
-// Simple RDBMS - Phase 5: Storage + Schema + CRUD + Web App
-//
-// Modular implementation wiring existing packages: database, parser, executor, storage, schema.
-
 package main
 
 import (
