@@ -238,12 +238,19 @@ func TestStateRecoveryFromLog(t *testing.T) {
 		}
 
 		// Verify correct data was restored
-		for i, row := range results {
+		// Build a map of id -> value for assertions (order-independent)
+		valueMap := make(map[int64]float64)
+		for _, row := range results {
+			id := row["id"].(float64)
 			value := row["value"].(float64)
-			expectedValue := float64((i + 1) * 10)
+			valueMap[int64(id)] = value
+		}
 
-			if value != expectedValue {
-				t.Errorf("Row %d: expected value %.0f, got %.0f", i+1, expectedValue, value)
+		// Check each row has correct value
+		for i := 1; i <= 5; i++ {
+			expectedValue := float64(i * 10)
+			if val, exists := valueMap[int64(i)]; !exists || val != expectedValue {
+				t.Errorf("Row %d: expected value %.0f, got %.0f", i, expectedValue, val)
 			}
 		}
 
