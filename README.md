@@ -1,4 +1,4 @@
-# Simple RDBMS
+4# Simple RDBMS
 
 A lightweight relational database management system (RDBMS) written in Go, featuring an interactive SQL REPL with support for basic SQL operations.
 
