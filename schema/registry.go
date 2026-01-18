@@ -98,7 +98,7 @@ func (sr *SchemaRegistry) MigrateRow(tableName string, row map[string]interface{
 			return nil, fmt.Errorf("no migration path from %s v%d to v%d", tableName, version, version+1)
 		}
 
-		// Apply migration operations
+		// Apply each migration operation sequentially
 		var err error
 		migratedRow, err = applyMigration(migratedRow, migration)
 		if err != nil {

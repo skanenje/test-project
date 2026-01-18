@@ -50,7 +50,7 @@ func TestSnapshotCreateAndRestore(t *testing.T) {
 	}
 
 	// Create snapshot
-	meta, err := sm.CreateSnapshot(state, 10)
+	meta, err := sm.CreateSnapshot(state, 10, 10)
 	if err != nil {
 		t.Fatalf("Failed to create snapshot: %v", err)
 	}
@@ -112,7 +112,7 @@ func TestSnapshotHistory(t *testing.T) {
 			},
 			DeletedRows: make(map[string]map[int64]bool),
 		}
-		sm.CreateSnapshot(state, uint64(i*10))
+		sm.CreateSnapshot(state, uint64(i*10), int64(i*10))
 	}
 
 	// Check history
@@ -146,7 +146,7 @@ func TestSnapshotPruning(t *testing.T) {
 			},
 			DeletedRows: make(map[string]map[int64]bool),
 		}
-		sm.CreateSnapshot(state, uint64(i*10))
+		sm.CreateSnapshot(state, uint64(i*10), int64(i*10))
 	}
 
 	// Prune to keep only 2
@@ -231,7 +231,7 @@ func TestQueryEngineReplayAfterSnapshot(t *testing.T) {
 
 	// Create snapshot at event 6 (after 1 schema + 5 inserts)
 	state1, _ := qe.GetCurrentState()
-	_, _ = sm.CreateSnapshot(state1, es.GetLastEventID())
+	_, _ = sm.CreateSnapshot(state1, es.GetLastEventID(), int64(es.GetLastEventID()))
 
 	// Record more events after snapshot
 	for i := 6; i <= 8; i++ {

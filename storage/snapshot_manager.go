@@ -72,7 +72,7 @@ func (sm *SnapshotManager) saveSnapshotIndex() error {
 }
 
 // CreateSnapshot creates and saves a snapshot of the current state
-func (sm *SnapshotManager) CreateSnapshot(state *DerivedState, baseEventID uint64) (*SnapshotMeta, error) {
+func (sm *SnapshotManager) CreateSnapshot(state *DerivedState, baseEventID uint64, eventsIncluded int64) (*SnapshotMeta, error) {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 
@@ -92,7 +92,7 @@ func (sm *SnapshotManager) CreateSnapshot(state *DerivedState, baseEventID uint6
 		CreatedAt:      time.Now().UTC(),
 		SnapshotPath:   filepath.Join(sm.snapshotDir, snapshotID+".json"),
 		DataHash:       dataHash,
-		EventsIncluded: countEvents(state),
+		EventsIncluded: eventsIncluded,
 	}
 
 	// Create snapshot data

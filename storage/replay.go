@@ -4,9 +4,26 @@ import "rdbms/eventlog"
 
 // replayEventsOntoState merges new events onto an existing state
 func replayEventsOntoState(baseState *DerivedState, events []*eventlog.Event) (*DerivedState, error) {
+	// Deep copy base state to avoid mutating it
+	newTables := make(map[string]map[int64]Row, len(baseState.Tables))
+	for tbl, rows := range baseState.Tables {
+		rowCopy := make(map[int64]Row, len(rows))
+		for id, row := range rows {
+			rowCopy[id] = row
+		}
+		newTables[tbl] = rowCopy
+	}
+	newDeleted := make(map[string]map[int64]bool, len(baseState.DeletedRows))
+	for tbl, del := range baseState.DeletedRows {
+		delCopy := make(map[int64]bool, len(del))
+		for id := range del {
+			delCopy[id] = true
+		}
+		newDeleted[tbl] = delCopy
+	}
 	state := &DerivedState{
-		Tables:      baseState.Tables,      // Reference same tables
-		DeletedRows: baseState.DeletedRows, // Reference same deletions
+		Tables:      newTables,
+		DeletedRows: newDeleted,
 	}
 
 	for _, e := range events {
