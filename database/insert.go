@@ -71,9 +71,10 @@ func (db *Database) Insert(tableName string, row storage.Row) (int64, error) {
 	db.queryEngine.InvalidateCache()
 
 	// Check if we should create a snapshot
-	if db.eventStore.GetLastEventID()%uint64(db.snapshotInterval) == 0 {
+	lastEventID := db.eventStore.GetLastEventID()
+	if lastEventID > 0 && lastEventID%uint64(db.snapshotInterval) == 0 {
 		if state != nil {
-			db.snapshotManager.CreateSnapshot(state, db.eventStore.GetLastEventID())
+			db.snapshotManager.CreateSnapshot(state, lastEventID, int64(lastEventID))
 		}
 	}
 

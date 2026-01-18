@@ -18,14 +18,5 @@ func computeSnapshotHash(state *DerivedState) (string, error) {
 	return hex.EncodeToString(hash[:]), nil
 }
 
-// countEvents counts total number of events represented in the state
-func countEvents(state *DerivedState) int64 {
-	count := int64(0)
-	for _, tableRows := range state.Tables {
-		count += int64(len(tableRows))
-	}
-	for _, deletedSet := range state.DeletedRows {
-		count += int64(len(deletedSet))
-	}
-	return count
-}
+// This function is removed as it cannot accurately calculate the event count from the state.
+// The event count should be tracked during state derivation and passed to the snapshot creation process.

@@ -89,11 +89,12 @@ func ReplayEventsWithMigrations(events []*eventlog.Event, targetSchemaVersion in
 			if eventSchemaVer := e.Version; eventSchemaVer < targetSchemaVersion && migrationHandler != nil {
 				migratedRow, err := migrationHandler.MigrateRowIfNeeded(tableName, row, eventSchemaVer, targetSchemaVersion)
 				if err != nil {
-					// Log but continue - don't fail entire replay
-					fmt.Printf("Warning: migration failed for row %d in table %s: %v\n", rowID, tableName, err)
-				} else {
-					row = migratedRow
+					// Log but continue - don't fail entire replay.
+					// CRITICAL: Do not add the row to the state if migration fails.
+					fmt.Printf("Warning: migration failed for row %d in table %s, skipping row: %v\n", rowID, tableName, err)
+					continue // Skip to the next event
 				}
+				row = migratedRow
 			}
 
 			state.Tables[tableName][rowID] = row

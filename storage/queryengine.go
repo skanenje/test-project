@@ -2,8 +2,6 @@ package storage
 
 import (
 	"sync"
-
-	"rdbms/eventlog"
 )
 
 // QueryEngine provides efficient querying of the database state
@@ -63,8 +61,8 @@ func (qe *QueryEngine) GetCurrentState() (*DerivedState, error) {
 
 	// Replay events onto base state
 	if len(events) > 0 {
-		mergedEvents := append([]*eventlog.Event{}, events...) // Copy for safety
-		replayedState, err := replayEventsOntoState(baseState, mergedEvents)
+		// Replay events onto base state to merge snapshot with new events
+		replayedState, err := replayEventsOntoState(baseState, events)
 		if err != nil {
 			return nil, err
 		}
