@@ -1,4 +1,4 @@
-package storage
+package integration
 
 import (
 	"os"
@@ -6,6 +6,7 @@ import (
 
 	"rdbms/eventlog"
 	"rdbms/schema"
+	"rdbms/storage"
 )
 
 func TestMigrationHandler(t *testing.T) {
@@ -34,10 +35,10 @@ func TestMigrationHandler(t *testing.T) {
 	})
 
 	// Create migration handler
-	handler := NewMigrationHandler(registry)
+	handler := storage.NewMigrationHandler(registry)
 
 	// Test migrating a row
-	row := Row{"id": int64(1), "name": "Alice"}
+	row := storage.Row{"id": int64(1), "name": "Alice"}
 	migratedRow, err := handler.MigrateRowIfNeeded("users", row, 1, 2)
 	if err != nil {
 		t.Fatalf("Migration failed: %v", err)
@@ -75,7 +76,7 @@ func TestReplayEventsWithMigrations(t *testing.T) {
 		},
 	})
 
-	handler := NewMigrationHandler(registry)
+	handler := storage.NewMigrationHandler(registry)
 
 	// Create events (in schema v1)
 	events := []*eventlog.Event{
@@ -120,7 +121,7 @@ func TestReplayEventsWithMigrations(t *testing.T) {
 	}
 
 	// Replay with migration to v2
-	state, err := ReplayEventsWithMigrations(events, 2, handler)
+	state, err := storage.ReplayEventsWithMigrations(events, 2, handler)
 	if err != nil {
 		t.Fatalf("Replay failed: %v", err)
 	}
@@ -168,7 +169,7 @@ func TestGetSchemaVersionHistory(t *testing.T) {
 		},
 	}
 
-	history := GetSchemaVersionHistory(events)
+	history := storage.GetSchemaVersionHistory(events)
 
 	usersVersions := history["users"]
 	if len(usersVersions) != 2 {
@@ -202,7 +203,7 @@ func TestMigrationFailureRecovery(t *testing.T) {
 	registry.RegisterSchema("test", 2, v2Cols)
 
 	// Migration that will fail (no path from v1 to v2 registered)
-	handler := NewMigrationHandler(registry)
+	handler := storage.NewMigrationHandler(registry)
 
 	// Create events
 	events := []*eventlog.Event{
@@ -226,7 +227,7 @@ func TestMigrationFailureRecovery(t *testing.T) {
 
 	// Replay to higher version without migration should gracefully handle errors
 	// (it should skip the problematic row but continue)
-	state, err := ReplayEventsWithMigrations(events, 2, handler)
+	state, err := storage.ReplayEventsWithMigrations(events, 2, handler)
 	if err != nil {
 		t.Fatalf("Replay should not fail on missing migration: %v", err)
 	}
@@ -276,7 +277,7 @@ func TestComplexMultiTableMigration(t *testing.T) {
 		&schema.RemoveColumnOp{ColumnName: "price"},
 	})
 
-	handler := NewMigrationHandler(registry)
+	handler := storage.NewMigrationHandler(registry)
 
 	// Create events from both tables
 	events := []*eventlog.Event{
@@ -314,7 +315,7 @@ func TestComplexMultiTableMigration(t *testing.T) {
 		},
 	}
 
-	state, _ := ReplayEventsWithMigrations(events, 2, handler)
+	state, _ := storage.ReplayEventsWithMigrations(events, 2, handler)
 
 	// Check users table
 	userRows := state.GetTableRows("users")

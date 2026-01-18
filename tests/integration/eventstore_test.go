@@ -1,10 +1,11 @@
-package storage
+package integration
 
 import (
 	"os"
 	"testing"
 
 	"rdbms/eventlog"
+	"rdbms/storage"
 )
 
 func TestEventStoreIntegration(t *testing.T) {
@@ -12,7 +13,7 @@ func TestEventStoreIntegration(t *testing.T) {
 	tmpDir := t.TempDir()
 	defer os.RemoveAll(tmpDir)
 
-	es, err := NewEventStore(tmpDir)
+	es, err := storage.NewEventStore(tmpDir)
 	if err != nil {
 		t.Fatalf("Failed to create event store: %v", err)
 	}
@@ -36,7 +37,7 @@ func TestEventStoreIntegration(t *testing.T) {
 	}
 
 	// Test 2: Record row insertion
-	row1 := Row{"id": int64(1), "name": "Alice"}
+	row1 := storage.Row{"id": int64(1), "name": "Alice"}
 	insertEvent, err := es.RecordRowInserted("users", 0, row1, "tx-2")
 	if err != nil {
 		t.Fatalf("Failed to record insert: %v", err)
@@ -80,7 +81,7 @@ func TestEventStoreIntegration(t *testing.T) {
 	}
 
 	// Test 7: Derive state from events
-	state, err := ReplayEvents(events)
+	state, err := storage.ReplayEvents(events)
 	if err != nil {
 		t.Fatalf("Failed to derive state: %v", err)
 	}
@@ -159,7 +160,7 @@ func TestStateReplay(t *testing.T) {
 		},
 	}
 
-	state, err := ReplayEvents(events)
+	state, err := storage.ReplayEvents(events)
 	if err != nil {
 		t.Fatalf("Failed to replay events: %v", err)
 	}

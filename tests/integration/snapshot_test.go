@@ -1,17 +1,18 @@
-package storage
+package integration
 
 import (
 	"os"
 	"testing"
 
 	"rdbms/eventlog"
+	"rdbms/storage"
 )
 
 func TestSnapshotManagerCreation(t *testing.T) {
 	tmpDir := t.TempDir()
 	defer os.RemoveAll(tmpDir)
 
-	sm, err := NewSnapshotManager(tmpDir)
+	sm, err := storage.NewSnapshotManager(tmpDir)
 	if err != nil {
 		t.Fatalf("Failed to create snapshot manager: %v", err)
 	}
@@ -32,14 +33,14 @@ func TestSnapshotCreateAndRestore(t *testing.T) {
 	tmpDir := t.TempDir()
 	defer os.RemoveAll(tmpDir)
 
-	sm, _ := NewSnapshotManager(tmpDir)
+	sm, _ := storage.NewSnapshotManager(tmpDir)
 
 	// Create sample state
-	state := &DerivedState{
-		Tables: map[string]map[int64]Row{
+	state := &storage.DerivedState{
+		Tables: map[string]map[int64]storage.Row{
 			"users": {
-				1: Row{"id": int64(1), "name": "Alice"},
-				2: Row{"id": int64(2), "name": "Bob"},
+				1: storage.Row{"id": int64(1), "name": "Alice"},
+				2: storage.Row{"id": int64(2), "name": "Bob"},
 			},
 		},
 		DeletedRows: map[string]map[int64]bool{
@@ -100,14 +101,14 @@ func TestSnapshotHistory(t *testing.T) {
 	tmpDir := t.TempDir()
 	defer os.RemoveAll(tmpDir)
 
-	sm, _ := NewSnapshotManager(tmpDir)
+	sm, _ := storage.NewSnapshotManager(tmpDir)
 
 	// Create 3 snapshots
 	for i := 1; i <= 3; i++ {
-		state := &DerivedState{
-			Tables: map[string]map[int64]Row{
+		state := &storage.DerivedState{
+			Tables: map[string]map[int64]storage.Row{
 				"test": {
-					int64(i): Row{"id": int64(i)},
+					int64(i): storage.Row{"id": int64(i)},
 				},
 			},
 			DeletedRows: make(map[string]map[int64]bool),
@@ -134,14 +135,14 @@ func TestSnapshotPruning(t *testing.T) {
 	tmpDir := t.TempDir()
 	defer os.RemoveAll(tmpDir)
 
-	sm, _ := NewSnapshotManager(tmpDir)
+	sm, _ := storage.NewSnapshotManager(tmpDir)
 
 	// Create 5 snapshots
 	for i := 1; i <= 5; i++ {
-		state := &DerivedState{
-			Tables: map[string]map[int64]Row{
+		state := &storage.DerivedState{
+			Tables: map[string]map[int64]storage.Row{
 				"test": {
-					int64(i): Row{"id": int64(i)},
+					int64(i): storage.Row{"id": int64(i)},
 				},
 			},
 			DeletedRows: make(map[string]map[int64]bool),
@@ -173,12 +174,12 @@ func TestQueryEngineWithSnapshots(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	// Create event store
-	es, _ := NewEventStore(tmpDir)
+	es, _ := storage.NewEventStore(tmpDir)
 	defer es.Close()
 
 	// Create query engine
-	sm, _ := NewSnapshotManager(tmpDir)
-	qe := NewQueryEngine(es, sm)
+	sm, _ := storage.NewSnapshotManager(tmpDir)
+	qe := storage.NewQueryEngine(es, sm)
 
 	// Record some events
 	cols := []eventlog.ColumnDefinition{
@@ -189,7 +190,7 @@ func TestQueryEngineWithSnapshots(t *testing.T) {
 
 	// Insert 3 rows
 	for i := 1; i <= 3; i++ {
-		es.RecordRowInserted("test", int64(i), Row{"id": int64(i), "value": int64(i * 10)}, "tx-2")
+		es.RecordRowInserted("test", int64(i), storage.Row{"id": int64(i), "value": int64(i * 10)}, "tx-2")
 	}
 
 	// Get state
@@ -211,12 +212,12 @@ func TestQueryEngineReplayAfterSnapshot(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	// Create event store
-	es, _ := NewEventStore(tmpDir)
+	es, _ := storage.NewEventStore(tmpDir)
 	defer es.Close()
 
 	// Create snapshot manager and query engine
-	sm, _ := NewSnapshotManager(tmpDir)
-	qe := NewQueryEngine(es, sm)
+	sm, _ := storage.NewSnapshotManager(tmpDir)
+	qe := storage.NewQueryEngine(es, sm)
 
 	// Record initial events
 	cols := []eventlog.ColumnDefinition{
@@ -226,7 +227,7 @@ func TestQueryEngineReplayAfterSnapshot(t *testing.T) {
 
 	// Insert 5 rows
 	for i := 1; i <= 5; i++ {
-		es.RecordRowInserted("data", int64(i), Row{"id": int64(i)}, "tx-2")
+		es.RecordRowInserted("data", int64(i), storage.Row{"id": int64(i)}, "tx-2")
 	}
 
 	// Create snapshot at event 6 (after 1 schema + 5 inserts)
@@ -235,7 +236,7 @@ func TestQueryEngineReplayAfterSnapshot(t *testing.T) {
 
 	// Record more events after snapshot
 	for i := 6; i <= 8; i++ {
-		es.RecordRowInserted("data", int64(i), Row{"id": int64(i)}, "tx-3")
+		es.RecordRowInserted("data", int64(i), storage.Row{"id": int64(i)}, "tx-3")
 	}
 
 	// Get state again - should replay from snapshot + new events
@@ -256,11 +257,11 @@ func TestQueryEngineGetTableRows(t *testing.T) {
 	tmpDir := t.TempDir()
 	defer os.RemoveAll(tmpDir)
 
-	es, _ := NewEventStore(tmpDir)
+	es, _ := storage.NewEventStore(tmpDir)
 	defer es.Close()
 
-	sm, _ := NewSnapshotManager(tmpDir)
-	qe := NewQueryEngine(es, sm)
+	sm, _ := storage.NewSnapshotManager(tmpDir)
+	qe := storage.NewQueryEngine(es, sm)
 
 	// Setup
 	cols := []eventlog.ColumnDefinition{
@@ -270,10 +271,10 @@ func TestQueryEngineGetTableRows(t *testing.T) {
 	es.RecordSchemaCreated("users", cols, "id", "tx-1")
 
 	// Insert and delete rows
-	es.RecordRowInserted("users", 1, Row{"id": int64(1), "name": "Alice"}, "tx-2")
-	es.RecordRowInserted("users", 2, Row{"id": int64(2), "name": "Bob"}, "tx-2")
-	es.RecordRowInserted("users", 3, Row{"id": int64(3), "name": "Charlie"}, "tx-2")
-	es.RecordRowDeleted("users", 2, Row{"id": int64(2), "name": "Bob"}, "tx-3")
+	es.RecordRowInserted("users", 1, storage.Row{"id": int64(1), "name": "Alice"}, "tx-2")
+	es.RecordRowInserted("users", 2, storage.Row{"id": int64(2), "name": "Bob"}, "tx-2")
+	es.RecordRowInserted("users", 3, storage.Row{"id": int64(3), "name": "Charlie"}, "tx-2")
+	es.RecordRowDeleted("users", 2, storage.Row{"id": int64(2), "name": "Bob"}, "tx-3")
 
 	// Query
 	rows, err := qe.GetTableRows("users")
@@ -292,11 +293,11 @@ func TestQueryEngineGetRow(t *testing.T) {
 	tmpDir := t.TempDir()
 	defer os.RemoveAll(tmpDir)
 
-	es, _ := NewEventStore(tmpDir)
+	es, _ := storage.NewEventStore(tmpDir)
 	defer es.Close()
 
-	sm, _ := NewSnapshotManager(tmpDir)
-	qe := NewQueryEngine(es, sm)
+	sm, _ := storage.NewSnapshotManager(tmpDir)
+	qe := storage.NewQueryEngine(es, sm)
 
 	// Setup
 	cols := []eventlog.ColumnDefinition{
@@ -305,7 +306,7 @@ func TestQueryEngineGetRow(t *testing.T) {
 	es.RecordSchemaCreated("test", cols, "id", "tx-1")
 
 	// Insert row
-	es.RecordRowInserted("test", 42, Row{"id": int64(42), "value": "important"}, "tx-2")
+	es.RecordRowInserted("test", 42, storage.Row{"id": int64(42), "value": "important"}, "tx-2")
 
 	// Get specific row
 	row, exists, err := qe.GetRow("test", 42)
