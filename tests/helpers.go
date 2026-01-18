@@ -16,11 +16,11 @@ import (
 type TestDB struct {
 	DB      *database.Database
 	DataDir string
-	T       *testing.T
+	T       testing.TB
 }
 
 // NewTestDB creates a new database instance for testing with a temporary directory
-func NewTestDB(t *testing.T) *TestDB {
+func NewTestDB(t testing.TB) *TestDB {
 	tempDir := t.TempDir()
 
 	db, err := database.New(tempDir)
@@ -175,11 +175,11 @@ func (tdb *TestDB) Cleanup() {
 type TestCatalog struct {
 	Catalog *catalog.Catalog
 	DataDir string
-	T       *testing.T
+	T       testing.TB
 }
 
 // NewTestCatalog creates a new catalog instance for testing
-func NewTestCatalog(t *testing.T) *TestCatalog {
+func NewTestCatalog(t testing.TB) *TestCatalog {
 	tempDir := t.TempDir()
 
 	cat, err := catalog.New(tempDir)
