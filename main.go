@@ -17,7 +17,7 @@ func runREPL(db *database.Database) {
 	exec := executor.New(db)
 	scanner := bufio.NewScanner(os.Stdin)
 
-	fmt.Println("=== Simple RDBMS REPL ===")
+	fmt.Println("=== RDBMS REPL ===")
 	fmt.Println("Type SQL commands or 'exit' to quit")
 	fmt.Println()
 
