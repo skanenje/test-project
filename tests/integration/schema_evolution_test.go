@@ -1,58 +1,60 @@
-package schema
+package integration
 
 import (
 	"testing"
+
+	"rdbms/schema"
 )
 
 func TestSchemaRegistry(t *testing.T) {
-	sr := NewSchemaRegistry()
+	sr := schema.NewSchemaRegistry()
 
 	// Register v1 schema
-	v1Cols := []Column{
-		{Name: "id", Type: TypeInt, PrimaryKey: true},
-		{Name: "name", Type: TypeText},
+	v1Cols := []schema.Column{
+		{Name: "id", Type: schema.TypeInt, PrimaryKey: true},
+		{Name: "name", Type: schema.TypeText},
 	}
 	sr.RegisterSchema("users", 1, v1Cols)
 
 	// Retrieve schema
-	schema, err := sr.GetSchema("users", 1)
+	s, err := sr.GetSchema("users", 1)
 	if err != nil {
 		t.Fatalf("Failed to get schema: %v", err)
 	}
 
-	if schema.Version != 1 {
-		t.Errorf("Expected version 1, got %d", schema.Version)
+	if s.Version != 1 {
+		t.Errorf("Expected version 1, got %d", s.Version)
 	}
 
-	if len(schema.Columns) != 2 {
-		t.Errorf("Expected 2 columns, got %d", len(schema.Columns))
+	if len(s.Columns) != 2 {
+		t.Errorf("Expected 2 columns, got %d", len(s.Columns))
 	}
 
 	t.Log("✓ Schema registry test passed")
 }
 
 func TestAddColumnMigration(t *testing.T) {
-	sr := NewSchemaRegistry()
+	sr := schema.NewSchemaRegistry()
 
 	// v1: id, name
-	v1Cols := []Column{
-		{Name: "id", Type: TypeInt, PrimaryKey: true},
-		{Name: "name", Type: TypeText},
+	v1Cols := []schema.Column{
+		{Name: "id", Type: schema.TypeInt, PrimaryKey: true},
+		{Name: "name", Type: schema.TypeText},
 	}
 	sr.RegisterSchema("users", 1, v1Cols)
 
 	// v2: id, name, email (new column)
-	v2Cols := []Column{
-		{Name: "id", Type: TypeInt, PrimaryKey: true},
-		{Name: "name", Type: TypeText},
-		{Name: "email", Type: TypeText},
+	v2Cols := []schema.Column{
+		{Name: "id", Type: schema.TypeInt, PrimaryKey: true},
+		{Name: "name", Type: schema.TypeText},
+		{Name: "email", Type: schema.TypeText},
 	}
 	sr.RegisterSchema("users", 2, v2Cols)
 
 	// Register migration: add email column with default value
-	migration := []MigrationOp{
-		&AddColumnOp{
-			Column:  Column{Name: "email", Type: TypeText},
+	migration := []schema.MigrationOp{
+		&schema.AddColumnOp{
+			Column:  schema.Column{Name: "email", Type: schema.TypeText},
 			Default: "noemail@example.com",
 		},
 	}
@@ -77,26 +79,26 @@ func TestAddColumnMigration(t *testing.T) {
 }
 
 func TestRemoveColumnMigration(t *testing.T) {
-	sr := NewSchemaRegistry()
+	sr := schema.NewSchemaRegistry()
 
 	// v1: id, name, deprecated_field
-	v1Cols := []Column{
-		{Name: "id", Type: TypeInt, PrimaryKey: true},
-		{Name: "name", Type: TypeText},
-		{Name: "deprecated_field", Type: TypeText},
+	v1Cols := []schema.Column{
+		{Name: "id", Type: schema.TypeInt, PrimaryKey: true},
+		{Name: "name", Type: schema.TypeText},
+		{Name: "deprecated_field", Type: schema.TypeText},
 	}
 	sr.RegisterSchema("users", 1, v1Cols)
 
 	// v2: id, name (removed deprecated_field)
-	v2Cols := []Column{
-		{Name: "id", Type: TypeInt, PrimaryKey: true},
-		{Name: "name", Type: TypeText},
+	v2Cols := []schema.Column{
+		{Name: "id", Type: schema.TypeInt, PrimaryKey: true},
+		{Name: "name", Type: schema.TypeText},
 	}
 	sr.RegisterSchema("users", 2, v2Cols)
 
 	// Register migration: remove column
-	migration := []MigrationOp{
-		&RemoveColumnOp{ColumnName: "deprecated_field"},
+	migration := []schema.MigrationOp{
+		&schema.RemoveColumnOp{ColumnName: "deprecated_field"},
 	}
 	sr.RegisterMigration("users", 1, 2, migration)
 
@@ -124,25 +126,25 @@ func TestRemoveColumnMigration(t *testing.T) {
 }
 
 func TestRenameColumnMigration(t *testing.T) {
-	sr := NewSchemaRegistry()
+	sr := schema.NewSchemaRegistry()
 
 	// v1: id, user_name
-	v1Cols := []Column{
-		{Name: "id", Type: TypeInt, PrimaryKey: true},
-		{Name: "user_name", Type: TypeText},
+	v1Cols := []schema.Column{
+		{Name: "id", Type: schema.TypeInt, PrimaryKey: true},
+		{Name: "user_name", Type: schema.TypeText},
 	}
 	sr.RegisterSchema("users", 1, v1Cols)
 
 	// v2: id, name
-	v2Cols := []Column{
-		{Name: "id", Type: TypeInt, PrimaryKey: true},
-		{Name: "name", Type: TypeText},
+	v2Cols := []schema.Column{
+		{Name: "id", Type: schema.TypeInt, PrimaryKey: true},
+		{Name: "name", Type: schema.TypeText},
 	}
 	sr.RegisterSchema("users", 2, v2Cols)
 
 	// Register migration: rename column
-	migration := []MigrationOp{
-		&RenameColumnOp{OldName: "user_name", NewName: "name"},
+	migration := []schema.MigrationOp{
+		&schema.RenameColumnOp{OldName: "user_name", NewName: "name"},
 	}
 	sr.RegisterMigration("users", 1, 2, migration)
 
@@ -169,25 +171,25 @@ func TestRenameColumnMigration(t *testing.T) {
 }
 
 func TestMultipleVersionMigration(t *testing.T) {
-	sr := NewSchemaRegistry()
+	sr := schema.NewSchemaRegistry()
 
 	// Setup: v1 -> v2 -> v3
-	v1Cols := []Column{{Name: "id", Type: TypeInt, PrimaryKey: true}}
-	v2Cols := []Column{{Name: "id", Type: TypeInt, PrimaryKey: true}, {Name: "name", Type: TypeText}}
-	v3Cols := []Column{{Name: "id", Type: TypeInt, PrimaryKey: true}, {Name: "name", Type: TypeText}, {Name: "email", Type: TypeText}}
+	v1Cols := []schema.Column{{Name: "id", Type: schema.TypeInt, PrimaryKey: true}}
+	v2Cols := []schema.Column{{Name: "id", Type: schema.TypeInt, PrimaryKey: true}, {Name: "name", Type: schema.TypeText}}
+	v3Cols := []schema.Column{{Name: "id", Type: schema.TypeInt, PrimaryKey: true}, {Name: "name", Type: schema.TypeText}, {Name: "email", Type: schema.TypeText}}
 
 	sr.RegisterSchema("users", 1, v1Cols)
 	sr.RegisterSchema("users", 2, v2Cols)
 	sr.RegisterSchema("users", 3, v3Cols)
 
 	// Migration 1->2: add name
-	sr.RegisterMigration("users", 1, 2, []MigrationOp{
-		&AddColumnOp{Column: Column{Name: "name", Type: TypeText}, Default: "unnamed"},
+	sr.RegisterMigration("users", 1, 2, []schema.MigrationOp{
+		&schema.AddColumnOp{Column: schema.Column{Name: "name", Type: schema.TypeText}, Default: "unnamed"},
 	})
 
 	// Migration 2->3: add email
-	sr.RegisterMigration("users", 2, 3, []MigrationOp{
-		&AddColumnOp{Column: Column{Name: "email", Type: TypeText}, Default: "noemail"},
+	sr.RegisterMigration("users", 2, 3, []schema.MigrationOp{
+		&schema.AddColumnOp{Column: schema.Column{Name: "email", Type: schema.TypeText}, Default: "noemail"},
 	})
 
 	// Migrate from v1 directly to v3
@@ -208,34 +210,34 @@ func TestMultipleVersionMigration(t *testing.T) {
 }
 
 func TestCompatibilityCheck(t *testing.T) {
-	sr := NewSchemaRegistry()
+	sr := schema.NewSchemaRegistry()
 
-	v1Cols := []Column{{Name: "id", Type: TypeInt, PrimaryKey: true}}
-	v2Cols := []Column{{Name: "id", Type: TypeInt, PrimaryKey: true}, {Name: "name", Type: TypeText}}
+	v1Cols := []schema.Column{{Name: "id", Type: schema.TypeInt, PrimaryKey: true}}
+	v2Cols := []schema.Column{{Name: "id", Type: schema.TypeInt, PrimaryKey: true}, {Name: "name", Type: schema.TypeText}}
 
 	sr.RegisterSchema("users", 1, v1Cols)
 	sr.RegisterSchema("users", 2, v2Cols)
 
 	// Without migration
 	check := sr.CheckCompatibility("users", 1, 2)
-	if check.Status != Incompatible {
+	if check.Status != schema.Incompatible {
 		t.Errorf("Expected incompatible status without migration, got %s", check.Status)
 	}
 
 	// Register migration
-	sr.RegisterMigration("users", 1, 2, []MigrationOp{
-		&AddColumnOp{Column: Column{Name: "name", Type: TypeText}, Default: "unnamed"},
+	sr.RegisterMigration("users", 1, 2, []schema.MigrationOp{
+		&schema.AddColumnOp{Column: schema.Column{Name: "name", Type: schema.TypeText}, Default: "unnamed"},
 	})
 
 	// With migration
 	check = sr.CheckCompatibility("users", 1, 2)
-	if check.Status != MigrationNeeded {
+	if check.Status != schema.MigrationNeeded {
 		t.Errorf("Expected migration-needed status, got %s", check.Status)
 	}
 
 	// Same version
 	check = sr.CheckCompatibility("users", 2, 2)
-	if check.Status != Compatible {
+	if check.Status != schema.Compatible {
 		t.Errorf("Expected compatible status for same version, got %s", check.Status)
 	}
 
@@ -243,11 +245,11 @@ func TestCompatibilityCheck(t *testing.T) {
 }
 
 func TestGetLatestSchemaVersion(t *testing.T) {
-	sr := NewSchemaRegistry()
+	sr := schema.NewSchemaRegistry()
 
-	v1Cols := []Column{{Name: "id", Type: TypeInt, PrimaryKey: true}}
-	v2Cols := []Column{{Name: "id", Type: TypeInt, PrimaryKey: true}, {Name: "name", Type: TypeText}}
-	v3Cols := []Column{{Name: "id", Type: TypeInt, PrimaryKey: true}, {Name: "name", Type: TypeText}, {Name: "email", Type: TypeText}}
+	v1Cols := []schema.Column{{Name: "id", Type: schema.TypeInt, PrimaryKey: true}}
+	v2Cols := []schema.Column{{Name: "id", Type: schema.TypeInt, PrimaryKey: true}, {Name: "name", Type: schema.TypeText}}
+	v3Cols := []schema.Column{{Name: "id", Type: schema.TypeInt, PrimaryKey: true}, {Name: "name", Type: schema.TypeText}, {Name: "email", Type: schema.TypeText}}
 
 	sr.RegisterSchema("users", 1, v1Cols)
 	sr.RegisterSchema("users", 3, v3Cols) // Out of order registration
@@ -262,9 +264,9 @@ func TestGetLatestSchemaVersion(t *testing.T) {
 }
 
 func TestSameVersionMigration(t *testing.T) {
-	sr := NewSchemaRegistry()
+	sr := schema.NewSchemaRegistry()
 
-	cols := []Column{{Name: "id", Type: TypeInt, PrimaryKey: true}}
+	cols := []schema.Column{{Name: "id", Type: schema.TypeInt, PrimaryKey: true}}
 	sr.RegisterSchema("users", 1, cols)
 
 	row := map[string]interface{}{"id": int64(1)}
@@ -281,10 +283,10 @@ func TestSameVersionMigration(t *testing.T) {
 }
 
 func TestBackwardMigrationFails(t *testing.T) {
-	sr := NewSchemaRegistry()
+	sr := schema.NewSchemaRegistry()
 
-	v1Cols := []Column{{Name: "id", Type: TypeInt, PrimaryKey: true}}
-	v2Cols := []Column{{Name: "id", Type: TypeInt, PrimaryKey: true}, {Name: "name", Type: TypeText}}
+	v1Cols := []schema.Column{{Name: "id", Type: schema.TypeInt, PrimaryKey: true}}
+	v2Cols := []schema.Column{{Name: "id", Type: schema.TypeInt, PrimaryKey: true}, {Name: "name", Type: schema.TypeText}}
 
 	sr.RegisterSchema("users", 1, v1Cols)
 	sr.RegisterSchema("users", 2, v2Cols)

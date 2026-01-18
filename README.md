@@ -14,6 +14,8 @@ A lightweight relational database management system (RDBMS) written in Go, featu
 
 ## Project Structure
 
+Each of the following directories contains a `README.md` file that describes its purpose in detail.
+
 ```
 ├── catalog/          # Database catalog management
 ├── cmd/web/          # Web server code
@@ -29,91 +31,6 @@ A lightweight relational database management system (RDBMS) written in Go, featu
 ├── main.go           # Entry point
 └── go.mod            # Module definition
 ```
-
-## Getting Started
-
-### Prerequisites
-
-- Go 1.21 or later
-
-### Installation
-
-```bash
-git clone <repository-url>
-cd test-project
-go mod download
-```
-
-### Running the Web Server
-
-```bash
-go run main.go web 8080
-```
-
-The web server will be available at `http://localhost:8080`.
-
-### Running Tests
-
-```bash
-go test ./...
-```
-
-## Example Usage
-
-The web interface provides a simple way to interact with the database. You can execute SQL queries and view the results in your browser.
-
-1.  Start the web server as described above.
-2.  Open your browser and navigate to `http://localhost:8080`.
-3.  Use the form to execute SQL queries.
-
-**Example Queries:**
-
-```sql
--- Create a table
-CREATE TABLE users (id INT, name VARCHAR(100), age INT)
-
--- Insert data
-INSERT INTO users VALUES (1, 'Alice', 30)
-INSERT INTO users VALUES (2, 'Bob', 25)
-
--- Select all records
-SELECT * FROM users
-
--- Select with WHERE clause
-SELECT * FROM users WHERE age > 25
-
--- Update records
-UPDATE users SET age = 31 WHERE name = 'Alice'
-
--- Delete records
-DELETE FROM users WHERE id = 2
-```
-
-## Core Components
-
-### Parser (`parser/`)
-Handles SQL statement parsing and validation. Converts raw SQL strings into executable query objects.
-
-### Database (`database/`)
-Manages database initialization, table creation, and transaction handling.
-
-### Executor (`executor/`)
-Executes parsed SQL statements against the database. Handles INSERT, SELECT, UPDATE, DELETE operations.
-
-### Schema (`schema/`)
-Defines table structures, column types, and metadata. Manages schema evolution and migrations.
-
-### Storage (`storage/`)
-Low-level data storage and retrieval engine. Includes the event store, snapshot manager, and query engine.
-
-### Catalog (`catalog/`)
-Maintains metadata about all tables and their schemas.
-
-### Index (`index/`)
-Provides indexing capabilities for faster data lookup.
-
-### Event Log (`eventlog/`)
-Manages the append-only log of database events.
 
 ## Development
 

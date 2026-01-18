@@ -1,4 +1,4 @@
-package storage
+package integration
 
 import (
 	"encoding/json"
@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"rdbms/eventlog"
+	"rdbms/storage"
 )
 
 func TestComputeEventChecksum(t *testing.T) {
@@ -27,7 +28,7 @@ func TestComputeEventChecksum(t *testing.T) {
 	}
 
 	// Compute checksum
-	checksum, err := ComputeEventChecksum(event)
+	checksum, err := storage.ComputeEventChecksum(event)
 	if err != nil {
 		t.Fatalf("Failed to compute checksum: %v", err)
 	}
@@ -62,11 +63,11 @@ func TestValidateEventChecksum(t *testing.T) {
 	}
 
 	// Compute and assign checksum
-	checksum, _ := ComputeEventChecksum(event)
+	checksum, _ := storage.ComputeEventChecksum(event)
 	event.Checksum = checksum
 
 	// Validate
-	valid, err := ValidateEventChecksum(event)
+	valid, err := storage.ValidateEventChecksum(event)
 	if err != nil {
 		t.Fatalf("Validation failed: %v", err)
 	}
@@ -77,7 +78,7 @@ func TestValidateEventChecksum(t *testing.T) {
 
 	// Test with corrupted checksum
 	event.Checksum = "0000000000000000000000000000000000000000000000000000000000000000"
-	valid, _ = ValidateEventChecksum(event)
+	valid, _ = storage.ValidateEventChecksum(event)
 	if valid {
 		t.Errorf("Corrupted checksum should not validate")
 	}
@@ -103,7 +104,7 @@ func TestDetectCorruption(t *testing.T) {
 			},
 		},
 	}
-	validEvent.Checksum, _ = ComputeEventChecksum(validEvent)
+	validEvent.Checksum, _ = storage.ComputeEventChecksum(validEvent)
 
 	// Create corrupted event (invalid payload)
 	corruptedEvent := &eventlog.Event{
@@ -117,7 +118,7 @@ func TestDetectCorruption(t *testing.T) {
 			// Missing "row_id" and "data"
 		},
 	}
-	corruptedEvent.Checksum, _ = ComputeEventChecksum(corruptedEvent)
+	corruptedEvent.Checksum, _ = storage.ComputeEventChecksum(corruptedEvent)
 
 	// Create event with bad checksum
 	checksumEvent := &eventlog.Event{
@@ -140,7 +141,7 @@ func TestDetectCorruption(t *testing.T) {
 	events := []*eventlog.Event{validEvent, corruptedEvent, checksumEvent}
 
 	// Detect corruption
-	report := DetectCorruption(events, nil)
+	report := storage.DetectCorruption(events, nil)
 
 	if report.TotalEvents != 3 {
 		t.Errorf("Expected 3 total events, got %d", report.TotalEvents)
@@ -183,7 +184,7 @@ func TestReplayEventsDeterministic(t *testing.T) {
 			},
 		},
 	}
-	schemaEvent.Checksum, _ = ComputeEventChecksum(schemaEvent)
+	schemaEvent.Checksum, _ = storage.ComputeEventChecksum(schemaEvent)
 
 	// Create row insertion event
 	insertEvent := &eventlog.Event{
@@ -201,7 +202,7 @@ func TestReplayEventsDeterministic(t *testing.T) {
 			},
 		},
 	}
-	insertEvent.Checksum, _ = ComputeEventChecksum(insertEvent)
+	insertEvent.Checksum, _ = storage.ComputeEventChecksum(insertEvent)
 
 	// Create row update event
 	updateEvent := &eventlog.Event{
@@ -218,18 +219,18 @@ func TestReplayEventsDeterministic(t *testing.T) {
 			},
 		},
 	}
-	updateEvent.Checksum, _ = ComputeEventChecksum(updateEvent)
+	updateEvent.Checksum, _ = storage.ComputeEventChecksum(updateEvent)
 
 	events := []*eventlog.Event{schemaEvent, insertEvent, updateEvent}
 
 	// Replay deterministically
-	opts := &DeterministicReplayOptions{
+	opts := &storage.DeterministicReplayOptions{
 		TargetSchemaVersion: 1,
 		SkipCorrupted:       false,
 		CollectErrors:       true,
 	}
 
-	result := ReplayEventsDeterministic(events, opts, nil)
+	result := storage.ReplayEventsDeterministic(events, opts, nil)
 
 	if result.EventsProcessed != 3 {
 		t.Errorf("Expected 3 events processed, got %d", result.EventsProcessed)
@@ -283,7 +284,7 @@ func TestReplayWithCorruptedEvents(t *testing.T) {
 			},
 		},
 	}
-	schemaEvent.Checksum, _ = ComputeEventChecksum(schemaEvent)
+	schemaEvent.Checksum, _ = storage.ComputeEventChecksum(schemaEvent)
 
 	// Create valid insert event
 	insertEvent1 := &eventlog.Event{
@@ -301,7 +302,7 @@ func TestReplayWithCorruptedEvents(t *testing.T) {
 			},
 		},
 	}
-	insertEvent1.Checksum, _ = ComputeEventChecksum(insertEvent1)
+	insertEvent1.Checksum, _ = storage.ComputeEventChecksum(insertEvent1)
 
 	// Create corrupted event
 	corruptedEvent := &eventlog.Event{
@@ -333,18 +334,18 @@ func TestReplayWithCorruptedEvents(t *testing.T) {
 			},
 		},
 	}
-	insertEvent2.Checksum, _ = ComputeEventChecksum(insertEvent2)
+	insertEvent2.Checksum, _ = storage.ComputeEventChecksum(insertEvent2)
 
 	events := []*eventlog.Event{schemaEvent, insertEvent1, corruptedEvent, insertEvent2}
 
 	// Replay with partial recovery
-	opts := &DeterministicReplayOptions{
+	opts := &storage.DeterministicReplayOptions{
 		TargetSchemaVersion: 1,
 		SkipCorrupted:       true, // Skip corrupted events
 		CollectErrors:       true,
 	}
 
-	result := ReplayEventsDeterministic(events, opts, nil)
+	result := storage.ReplayEventsDeterministic(events, opts, nil)
 
 	if result.EventsProcessed != 3 {
 		t.Errorf("Expected 3 events processed (skipping corrupted), got %d", result.EventsProcessed)
@@ -382,13 +383,13 @@ func TestReplayResultFormatting(t *testing.T) {
 			},
 		},
 	}
-	event.Checksum, _ = ComputeEventChecksum(event)
+	event.Checksum, _ = storage.ComputeEventChecksum(event)
 
 	// Replay
-	result := ReplayEventsDeterministic([]*eventlog.Event{event}, nil, nil)
+	result := storage.ReplayEventsDeterministic([]*eventlog.Event{event}, nil, nil)
 
 	// Format status
-	status := GetDeterministicReplayStatus(result)
+	status := storage.GetDeterministicReplayStatus(result)
 
 	if status == "" {
 		t.Errorf("Status should not be empty")
@@ -419,7 +420,7 @@ func TestDeterministicReplayAcrossVersions(t *testing.T) {
 			},
 		},
 	}
-	schemaEventV1.Checksum, _ = ComputeEventChecksum(schemaEventV1)
+	schemaEventV1.Checksum, _ = storage.ComputeEventChecksum(schemaEventV1)
 
 	// Insert with v1 schema
 	insertEventV1 := &eventlog.Event{
@@ -437,7 +438,7 @@ func TestDeterministicReplayAcrossVersions(t *testing.T) {
 			},
 		},
 	}
-	insertEventV1.Checksum, _ = ComputeEventChecksum(insertEventV1)
+	insertEventV1.Checksum, _ = storage.ComputeEventChecksum(insertEventV1)
 
 	// Schema evolution event
 	evolveEvent := &eventlog.Event{
@@ -455,7 +456,7 @@ func TestDeterministicReplayAcrossVersions(t *testing.T) {
 			},
 		},
 	}
-	evolveEvent.Checksum, _ = ComputeEventChecksum(evolveEvent)
+	evolveEvent.Checksum, _ = storage.ComputeEventChecksum(evolveEvent)
 
 	// Insert with v2 schema
 	insertEventV2 := &eventlog.Event{
@@ -474,18 +475,18 @@ func TestDeterministicReplayAcrossVersions(t *testing.T) {
 			},
 		},
 	}
-	insertEventV2.Checksum, _ = ComputeEventChecksum(insertEventV2)
+	insertEventV2.Checksum, _ = storage.ComputeEventChecksum(insertEventV2)
 
 	events := []*eventlog.Event{schemaEventV1, insertEventV1, evolveEvent, insertEventV2}
 
 	// Replay deterministically targeting v2
-	opts := &DeterministicReplayOptions{
+	opts := &storage.DeterministicReplayOptions{
 		TargetSchemaVersion: 2,
 		SkipCorrupted:       false,
 		CollectErrors:       true,
 	}
 
-	result := ReplayEventsDeterministic(events, opts, nil)
+	result := storage.ReplayEventsDeterministic(events, opts, nil)
 
 	if result.EventsProcessed != 4 {
 		t.Errorf("Expected 4 events processed, got %d", result.EventsProcessed)
@@ -512,7 +513,7 @@ func TestEventStoreReadAllEvents(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	// Create event store
-	es, err := NewEventStore(tmpDir)
+	es, err := storage.NewEventStore(tmpDir)
 	if err != nil {
 		t.Fatalf("Failed to create event store: %v", err)
 	}
@@ -550,10 +551,10 @@ func TestEventStoreReadAllEvents(t *testing.T) {
 }
 
 func TestCorruptionReportJSON(t *testing.T) {
-	report := &CorruptionReport{
+	report := &storage.CorruptionReport{
 		TotalEvents:     10,
 		CorruptedEvents: 2,
-		Issues: []CorruptionIssue{
+		Issues: []storage.CorruptionIssue{
 			{
 				EventID:   3,
 				EventType: "ROW_INSERTED",
@@ -575,7 +576,7 @@ func TestCorruptionReportJSON(t *testing.T) {
 	}
 
 	// Unmarshal to verify
-	var unmarshaled CorruptionReport
+	var unmarshaled storage.CorruptionReport
 	err = json.Unmarshal(jsonBytes, &unmarshaled)
 	if err != nil {
 		t.Fatalf("Failed to unmarshal report: %v", err)
