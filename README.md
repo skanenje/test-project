@@ -25,22 +25,22 @@ This is production architecture used by leaders like Amazon, Shopify, and enterp
 
 ## Core Features
 
-### 🎯 Event-Sourced Architecture
+###  Event-Sourced Architecture
 All database operations are recorded as immutable events in an append-only event store. No updates, no deletes at the storage layer—only appends. The current database state is reconstructed by replaying events, creating a complete, auditable history of every change.
 
-### 🔄 Snapshots for Performance
+###  Snapshots for Performance
 While replaying events provides auditability, it can be slow on large datasets. **Snapshots** periodically capture the database state, allowing new queries to load a recent snapshot and apply only new events. This combines the completeness of event sourcing with the performance requirements of production systems.
 
-### 📊 Full CRUD + Joins
+###  Full CRUD + Joins
 Standard relational operations: `CREATE TABLE`, `INSERT`, `SELECT`, `UPDATE`, `DELETE`, and `INNER JOIN`. Built on top of the event-sourced foundation.
 
 ### ⚡ Intelligent Indexing
 Hash-based indexes on configured columns provide O(1) lookups instead of O(n) table scans. Indexes are automatically maintained and rebuilt from snapshots during recovery.
 
-### 🏗️ Schema Evolution
+###  Schema Evolution
 Tables and schemas can evolve over time. Schema changes are recorded as events, enabling backward-compatible migrations and temporal queries across schema versions.
 
-### 🌐 REST API
+###  REST API
 Simple web server with HTTP endpoints for database operations. Perfect for learning or building microservices.
 
 ---
